@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -9,22 +9,26 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 800,
     height: 600,
+    frame: true, // Mantém a barra de navegação padrão
+    maximizable: true, // Desativa o botão maximizar
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      // Remova ou comente a linha abaixo se não tiver um preload.js
-      // preload: path.join(__dirname, 'preload.js'),
+      // preload: path.join(__dirname, 'preload.js'), // Comente se não estiver usando
     },
   });
 
-  // Carrega a build do Vite (produção)
   win.loadFile(path.join(__dirname, 'dist/index.html')).catch((err) => {
     console.error('Erro ao carregar index.html:', err);
   });
 
-  win.loadURL('http://localhost:8080').catch((err) => {
-  console.error('Erro ao carregar URL:', err);
-});
+  // Para desenvolvimento (comentar em produção)
+   win.loadURL('http://localhost:8080').catch((err) => {
+     console.error('Erro ao carregar URL:', err);
+   });
+
+  // Desativa o menu padrão
+  Menu.setApplicationMenu(null);
 }
 
 app.whenReady().then(() => {

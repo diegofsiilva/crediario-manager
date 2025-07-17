@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,9 +19,16 @@ import {
   ShoppingCart
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useDatabase, useClientes, useCartoes, useCompras } from "@/hooks/useDatabase";
+import { Cliente } from "@/lib/database";
 
 const Cartoes = () => {
   const { toast } = useToast();
+  const { isInitialized } = useDatabase();
+  const { criarCliente } = useClientes();
+  const { criarCartao } = useCartoes();
+  const { criarCompra } = useCompras();
+  
   const [formData, setFormData] = useState({
     cartaoNum: "AUTO",
     nome: "",
@@ -68,11 +75,107 @@ const Cartoes = () => {
     }
   };
 
-  const handleSave = () => {
-    toast({
-      title: "Cartão salvo com sucesso!",
-      description: `Cartão ${formData.cartaoNum} para ${formData.nome || "cliente"} foi salvo.`,
-    });
+  const handleSave = async () => {
+    if (!isInitialized) {
+      toast({
+        title: "Erro",
+        description: "Banco de dados não inicializado",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validação básica
+    if (!formData.nome || !formData.cpf) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Nome e CPF são obrigatórios",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // 1. Criar cliente
+      const clienteData: Omit<Cliente, 'id'> = {
+        nome: formData.nome,
+        cpf: formData.cpf,
+        rg: formData.rg,
+        endereco: `${formData.endereco}, ${formData.numero}`,
+        cidade: formData.cidade,
+        cep: "00000-000", // Campo não existe no form atual
+        telefone: formData.telefone,
+        email: "", // Campo não existe no form atual
+        data_nascimento: formData.nascimento,
+        estado_civil: "nao_informado",
+        profissao: "nao_informado",
+        renda: 0, // Campo não existe no form atual
+        data_cadastro: new Date().toISOString().split('T')[0],
+        status: 'ativo'
+      };
+
+      const clienteId = await criarCliente(clienteData);
+
+      // 2. Criar cartão
+      const cartaoData = {
+        cliente_id: clienteId,
+        numero_cartao: formData.cartaoNum === "AUTO" ? `CARD-${Date.now()}` : formData.cartaoNum,
+        limite: 5000, // Limite padrão
+        data_emissao: new Date().toISOString().split('T')[0],
+        data_vencimento: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1 ano
+        status: 'ativo' as const
+      };
+
+      const cartaoId = await criarCartao(cartaoData);
+
+      // 3. Criar compras dos produtos
+      for (const produto of produtos) {
+        if (produto.descricao && produto.venda) {
+          const valorTotal = parseFloat(produto.valorTotal) || parseFloat(produto.venda);
+          const numParcelas = 10; // Padrão do sistema
+          
+          await criarCompra({
+            cartao_id: cartaoId,
+            descricao: produto.descricao,
+            valor_total: valorTotal,
+            num_parcelas: numParcelas,
+            valor_parcela: valorTotal / numParcelas,
+            data_compra: new Date().toISOString().split('T')[0],
+            status: 'ativo'
+          });
+        }
+      }
+
+      // Limpar formulário
+      setFormData({
+        cartaoNum: "AUTO",
+        nome: "",
+        endereco: "",
+        numero: "",
+        bairro: "",
+        cidade: "",
+        vendedor: "",
+        supervisor: "",
+        cobrador: "",
+        estoque: "",
+        celular: "",
+        telefone: "",
+        gpsS: "",
+        gpsW: "",
+        cpf: "",
+        rg: "",
+        nascimento: "",
+        tipoCliente: "CLIENTES EM GERAL - [1]",
+        observacoes: ""
+      });
+
+      setProdutos([
+        { codigo: "", descricao: "", qtde: "", devolucao: "", venda: "", valorTotal: "", tipo: "" }
+      ]);
+
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+    }
   };
 
   const handleSearch = () => {

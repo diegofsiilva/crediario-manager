@@ -10,26 +10,36 @@ import Clientes from "./pages/Clientes";
 import Cobrancas from "./pages/Cobrancas";
 import Relatorios from "./pages/Relatorios";
 import NotFound from "./pages/NotFound";
+import { useDatabase } from "./hooks/useDatabase";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
+
+const AppContent = () => {
+  const { isInitialized } = useDatabase();
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="cartoes" element={<Cartoes />} />
+          <Route path="clientes" element={<Clientes />} />
+          <Route path="cobrancas" element={<Cobrancas />} />
+          <Route path="relatorios" element={<Relatorios />} />
+        </Route>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="cartoes" element={<Cartoes />} />
-            <Route path="clientes" element={<Clientes />} />
-            <Route path="cobrancas" element={<Cobrancas />} />
-            <Route path="relatorios" element={<Relatorios />} />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <AppContent />
     </TooltipProvider>
   </QueryClientProvider>
 );

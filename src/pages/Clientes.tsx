@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,12 +17,30 @@ import {
   CreditCard
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useDatabase, useClientes } from "@/hooks/useDatabase";
+import { Cliente } from "@/lib/database";
 
 const Clientes = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("todos");
+  const { isInitialized } = useDatabase();
+  const { clientes, loading, carregarClientes } = useClientes();
 
-  const clientes = [
+  useEffect(() => {
+    if (isInitialized) {
+      carregarClientes();
+    }
+  }, [isInitialized]);
+
+  const handleSearch = () => {
+    const filtro: any = {};
+    if (searchTerm) filtro.nome = searchTerm;
+    if (filterStatus !== "todos") filtro.status = filterStatus;
+    carregarClientes(filtro);
+  };
+
+  // Dados de exemplo para mostrar enquanto não há dados reais
+  const clientesExemplo = [
     {
       id: 1,
       nome: "João Silva",
@@ -115,10 +133,13 @@ const Clientes = () => {
     }
   };
 
-  const filteredClientes = clientes.filter(cliente => {
+  // Use dados de exemplo se não houver dados reais ainda
+  const dadosParaExibir = clientes.length > 0 ? clientes : clientesExemplo;
+
+  const filteredClientes = dadosParaExibir.filter((cliente: any) => {
     const matchesSearch = cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         cliente.cartao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         cliente.telefone.includes(searchTerm);
+                         (cliente.cartao || cliente.cpf || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (cliente.telefone || '').includes(searchTerm);
     
     const matchesFilter = filterStatus === "todos" || cliente.status === filterStatus;
     
@@ -126,11 +147,11 @@ const Clientes = () => {
   });
 
   const statusCounts = {
-    todos: clientes.length,
-    em_dia: clientes.filter(c => c.status === "em_dia").length,
-    vencido: clientes.filter(c => c.status === "vencido").length,
-    vencer: clientes.filter(c => c.status === "vencer").length,
-    quitado: clientes.filter(c => c.status === "quitado").length,
+    todos: dadosParaExibir.length,
+    em_dia: dadosParaExibir.filter((c: any) => c.status === "em_dia" || c.status === "ativo").length,
+    vencido: dadosParaExibir.filter((c: any) => c.status === "vencido" || c.status === "bloqueado").length,
+    vencer: dadosParaExibir.filter((c: any) => c.status === "vencer").length,
+    quitado: dadosParaExibir.filter((c: any) => c.status === "quitado" || c.status === "inativo").length,
   };
 
   return (
@@ -251,7 +272,7 @@ const Clientes = () => {
                       <h3 className="text-lg font-semibold text-foreground">{cliente.nome}</h3>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                         <CreditCard className="w-4 h-4" />
-                        <span>Cartão: {cliente.cartao}</span>
+                        <span>CPF: {(cliente as any).cpf || (cliente as any).cartao}</span>
                       </div>
                     </div>
                     {getStatusBadge(cliente.status)}
@@ -267,7 +288,7 @@ const Clientes = () => {
                       <span>{cliente.endereco}, {cliente.cidade}</span>
                     </div>
                     <div className="text-muted-foreground">
-                      <strong>Vendedor:</strong> {cliente.vendedor}
+                      <strong>Status:</strong> {cliente.status}
                     </div>
                   </div>
                 </div>
@@ -275,12 +296,12 @@ const Clientes = () => {
                 {/* Financial Info */}
                 <div className="space-y-3">
                   <div>
-                    <p className="text-sm text-muted-foreground">Valor em Aberto</p>
-                    <p className="text-xl font-bold text-foreground">{cliente.valor}</p>
+                    <p className="text-sm text-muted-foreground">Renda</p>
+                    <p className="text-xl font-bold text-foreground">R$ {(cliente as any).renda?.toLocaleString('pt-BR') || (cliente as any).valor || '0,00'}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Parcelas</p>
-                    <p className="text-sm font-medium text-foreground">{cliente.parcelas}</p>
+                    <p className="text-sm text-muted-foreground">Data Cadastro</p>
+                    <p className="text-sm font-medium text-foreground">{(cliente as any).data_cadastro || 'Não informado'}</p>
                   </div>
                 </div>
 

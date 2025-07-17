@@ -12,33 +12,60 @@ import {
   Plus
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useDatabase } from "@/hooks/useDatabase";
+import { database } from "@/lib/database";
+import { useEffect, useState } from "react";
 
 const Dashboard = () => {
+  const { isInitialized } = useDatabase();
+  const [estatisticas, setEstatisticas] = useState({
+    totalClientes: 0,
+    clientesAtivos: 0,
+    cartoesAtivos: 0,
+    pagamentosVencidos: 0,
+    valorEmAberto: 0
+  });
+
+  useEffect(() => {
+    const carregarEstatisticas = async () => {
+      if (!isInitialized) return;
+      
+      try {
+        const stats = await database.getEstatisticas();
+        setEstatisticas(stats);
+      } catch (error) {
+        console.error('Erro ao carregar estatísticas:', error);
+      }
+    };
+
+    carregarEstatisticas();
+  }, [isInitialized]);
+
   const stats = [
     {
       title: "Total de Clientes",
-      value: "1,247",
+      value: estatisticas.totalClientes.toString(),
       icon: Users,
       color: "text-blue-600",
       bgColor: "bg-blue-50"
     },
     {
       title: "Cartões Ativos",
-      value: "892",
+      value: estatisticas.cartoesAtivos.toString(),
       icon: CreditCard,
       color: "text-green-600",
       bgColor: "bg-green-50"
     },
     {
       title: "Valor em Aberto",
-      value: "R$ 245.890,50",
+      value: `R$ ${estatisticas.valorEmAberto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
       icon: DollarSign,
       color: "text-purple-600",
       bgColor: "bg-purple-50"
     },
     {
       title: "Vencidos Hoje",
-      value: "23",
+      value: estatisticas.pagamentosVencidos.toString(),
       icon: AlertTriangle,
       color: "text-red-600",
       bgColor: "bg-red-50"

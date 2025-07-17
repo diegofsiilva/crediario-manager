@@ -50,11 +50,12 @@ export interface Pagamento {
 
 class LocalDatabase {
   private dbName = 'crediario_db';
+  private dbVersion = 2; // Incremento da versão para forçar upgrade
   private db: IDBDatabase | null = null;
 
   async init(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, 1);
+      const request = indexedDB.open(this.dbName, this.dbVersion);
 
       request.onerror = () => reject(request.error);
       request.onsuccess = () => {
@@ -104,6 +105,19 @@ class LocalDatabase {
       const request = store.add(cliente);
 
       request.onsuccess = () => resolve(request.result as number);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async buscarClientePorId(id: number): Promise<Cliente | null> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['clientes'], 'readonly');
+      const store = transaction.objectStore('clientes');
+      const request = store.get(id);
+
+      request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
     });
   }

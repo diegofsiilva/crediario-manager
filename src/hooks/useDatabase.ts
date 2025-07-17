@@ -70,6 +70,20 @@ export const useClientes = () => {
     }
   };
 
+  const buscarClientePorId = async (id: number) => {
+    try {
+      return await database.buscarClientePorId(id);
+    } catch (error) {
+      console.error('Erro ao buscar cliente por ID:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao carregar dados do cliente",
+        variant: "destructive"
+      });
+      return null;
+    }
+  };
+
   const atualizarCliente = async (id: number, dados: Partial<Cliente>) => {
     try {
       await database.atualizarCliente(id, dados);
@@ -94,7 +108,8 @@ export const useClientes = () => {
     loading,
     carregarClientes,
     criarCliente,
-    atualizarCliente
+    atualizarCliente,
+    buscarClientePorId
   };
 };
 

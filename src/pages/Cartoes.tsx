@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,16 +24,10 @@ import { Cliente } from "@/lib/database";
 
 const Cartoes = () => {
   const { toast } = useToast();
-  const location = useLocation();
   const { isInitialized } = useDatabase();
-  const { criarCliente, buscarClientePorId, atualizarCliente } = useClientes();
+  const { criarCliente } = useClientes();
   const { criarCartao } = useCartoes();
   const { criarCompra } = useCompras();
-  
-  // Capturar parâmetros da URL para edição
-  const searchParams = new URLSearchParams(location.search);
-  const editId = searchParams.get('edit');
-  const isEditing = !!editId;
   
   const [formData, setFormData] = useState({
     cartaoNum: "AUTO",
@@ -57,44 +50,6 @@ const Cartoes = () => {
     tipoCliente: "CLIENTES EM GERAL - [1]",
     observacoes: ""
   });
-
-  // Carregar dados do cliente para edição
-  useEffect(() => {
-    const carregarClienteParaEdicao = async () => {
-      if (editId && isInitialized) {
-        try {
-          const cliente = await buscarClientePorId(Number(editId));
-          if (cliente) {
-            setFormData({
-              cartaoNum: "AUTO",
-              nome: cliente.nome,
-              endereco: cliente.endereco.split(',')[0] || "",
-              numero: cliente.endereco.split(',')[1]?.trim() || "",
-              bairro: "",
-              cidade: cliente.cidade,
-              vendedor: "",
-              supervisor: "",
-              cobrador: "",
-              estoque: "",
-              celular: "",
-              telefone: cliente.telefone,
-              gpsS: "",
-              gpsW: "",
-              cpf: cliente.cpf,
-              rg: cliente.rg,
-              nascimento: cliente.data_nascimento,
-              tipoCliente: "CLIENTES EM GERAL - [1]",
-              observacoes: ""
-            });
-          }
-        } catch (error) {
-          console.error('Erro ao carregar cliente:', error);
-        }
-      }
-    };
-
-    carregarClienteParaEdicao();
-  }, [editId, isInitialized, buscarClientePorId]);
 
   const [produtos, setProdutos] = useState([
     { codigo: "", descricao: "", qtde: "", devolucao: "", venda: "", valorTotal: "", tipo: "" }
@@ -141,97 +96,82 @@ const Cartoes = () => {
     }
 
     try {
+      // 1. Criar cliente
       const clienteData: Omit<Cliente, 'id'> = {
         nome: formData.nome,
         cpf: formData.cpf,
         rg: formData.rg,
         endereco: `${formData.endereco}, ${formData.numero}`,
         cidade: formData.cidade,
-        cep: "00000-000",
+        cep: "00000-000", // Campo não existe no form atual
         telefone: formData.telefone,
-        email: "",
+        email: "", // Campo não existe no form atual
         data_nascimento: formData.nascimento,
         estado_civil: "nao_informado",
         profissao: "nao_informado",
-        renda: 0,
+        renda: 0, // Campo não existe no form atual
         data_cadastro: new Date().toISOString().split('T')[0],
         status: 'ativo'
       };
 
-      if (isEditing) {
-        // Atualizar cliente existente
-        await atualizarCliente(Number(editId), clienteData);
-        
-        toast({
-          title: "Sucesso!",
-          description: "Cliente atualizado com sucesso!"
-        });
-      } else {
-        // Criar novo cliente
-        const clienteId = await criarCliente(clienteData);
+      const clienteId = await criarCliente(clienteData);
 
-        // Criar cartão apenas para novos clientes
-        const cartaoData = {
-          cliente_id: clienteId,
-          numero_cartao: formData.cartaoNum === "AUTO" ? `CARD-${Date.now()}` : formData.cartaoNum,
-          limite: 5000,
-          data_emissao: new Date().toISOString().split('T')[0],
-          data_vencimento: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          status: 'ativo' as const
-        };
+      // 2. Criar cartão
+      const cartaoData = {
+        cliente_id: clienteId,
+        numero_cartao: formData.cartaoNum === "AUTO" ? `CARD-${Date.now()}` : formData.cartaoNum,
+        limite: 5000, // Limite padrão
+        data_emissao: new Date().toISOString().split('T')[0],
+        data_vencimento: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1 ano
+        status: 'ativo' as const
+      };
 
-        const cartaoId = await criarCartao(cartaoData);
+      const cartaoId = await criarCartao(cartaoData);
 
-        // Criar compras dos produtos
-        for (const produto of produtos) {
-          if (produto.descricao && produto.venda) {
-            const valorTotal = parseFloat(produto.valorTotal) || parseFloat(produto.venda);
-            const numParcelas = 10;
-            
-            await criarCompra({
-              cartao_id: cartaoId,
-              descricao: produto.descricao,
-              valor_total: valorTotal,
-              num_parcelas: numParcelas,
-              valor_parcela: valorTotal / numParcelas,
-              data_compra: new Date().toISOString().split('T')[0],
-              status: 'ativo'
-            });
-          }
+      // 3. Criar compras dos produtos
+      for (const produto of produtos) {
+        if (produto.descricao && produto.venda) {
+          const valorTotal = parseFloat(produto.valorTotal) || parseFloat(produto.venda);
+          const numParcelas = 10; // Padrão do sistema
+          
+          await criarCompra({
+            cartao_id: cartaoId,
+            descricao: produto.descricao,
+            valor_total: valorTotal,
+            num_parcelas: numParcelas,
+            valor_parcela: valorTotal / numParcelas,
+            data_compra: new Date().toISOString().split('T')[0],
+            status: 'ativo'
+          });
         }
-
-        toast({
-          title: "Sucesso!",
-          description: "Cliente e cartão criados com sucesso!"
-        });
-
-        // Limpar formulário apenas quando criar novo
-        setFormData({
-          cartaoNum: "AUTO",
-          nome: "",
-          endereco: "",
-          numero: "",
-          bairro: "",
-          cidade: "",
-          vendedor: "",
-          supervisor: "",
-          cobrador: "",
-          estoque: "",
-          celular: "",
-          telefone: "",
-          gpsS: "",
-          gpsW: "",
-          cpf: "",
-          rg: "",
-          nascimento: "",
-          tipoCliente: "CLIENTES EM GERAL - [1]",
-          observacoes: ""
-        });
-
-        setProdutos([
-          { codigo: "", descricao: "", qtde: "", devolucao: "", venda: "", valorTotal: "", tipo: "" }
-        ]);
       }
+
+      // Limpar formulário
+      setFormData({
+        cartaoNum: "AUTO",
+        nome: "",
+        endereco: "",
+        numero: "",
+        bairro: "",
+        cidade: "",
+        vendedor: "",
+        supervisor: "",
+        cobrador: "",
+        estoque: "",
+        celular: "",
+        telefone: "",
+        gpsS: "",
+        gpsW: "",
+        cpf: "",
+        rg: "",
+        nascimento: "",
+        tipoCliente: "CLIENTES EM GERAL - [1]",
+        observacoes: ""
+      });
+
+      setProdutos([
+        { codigo: "", descricao: "", qtde: "", devolucao: "", venda: "", valorTotal: "", tipo: "" }
+      ]);
 
     } catch (error) {
       console.error('Erro ao salvar:', error);
@@ -250,11 +190,9 @@ const Cartoes = () => {
       {/* Page Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">
-            {isEditing ? 'Editar Cliente' : 'Cadastro de Cartões'}
-          </h1>
+          <h1 className="text-3xl font-bold text-foreground">Cadastro de Cartões</h1>
           <p className="text-muted-foreground mt-1">
-            {isEditing ? 'Atualize os dados do cliente' : 'Gestão completa de cartões de crediário'}
+            Gestão completa de cartões de crediário
           </p>
         </div>
         <div className="flex gap-2">
